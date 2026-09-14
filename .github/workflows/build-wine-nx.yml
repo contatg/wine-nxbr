@@ -1,0 +1,50 @@
+name: Build Wine-NX
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Preparar Docker
+        run: |
+          docker --version
+          docker run --rm --platform linux/arm64 devkitpro/devkita64 sh -c \
+            'echo devkitA64 OK && cmake --version && ninja --version'
+
+      - name: Verificar projeto
+        run: |
+          chmod +x wine-nx-probe/*.sh
+          git status --short
+          test -f wine-nx-probe/source/launcher.c
+
+      - name: Compilar Wine-NX
+        run: |
+          ./wine-nx-probe/build-wow64-dynarec.sh
+
+      - name: Listar resultados
+        if: always()
+        run: |
+          find wine-nx-probe -type f \
+            \( -name "*.nro" -o -name "*.zip" \) \
+            -print
+
+      - name: Enviar NRO/ZIP
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-nx-build
+          path: |
+            wine-nx-probe/**/*.nro
+            wine-nx-probe/**/*.zip
+          if-no-files-found: error
